@@ -71,8 +71,6 @@ type
 {$Region 'DotEnv4Delphi´s class declaration'}
   TDotEnv4Delphi = class(TInterfacedObject, iDotEnv4Delphi)
     private
-     class var FInstance: iDotEnv4Delphi;
-
      //Variables to manage the class
      fromDotEnvFile: Boolean;
      EnvPath:        string;
@@ -85,7 +83,6 @@ type
      //Constructors and Destructors
      constructor Create;
      Destructor Destroy; override;
-     class function New: iDotEnv4Delphi;
 
      //Main methods
      function Config(const OnlyFromEnvFile: Boolean = False): iDotEnv4Delphi; overload;
@@ -132,9 +129,7 @@ type
 //--------------------------------------------------------------------------------------------------------------------------
 
 //--------------------------------------------------------------------------------------------------------------------------
-var
- DotEnv: iDotEnv4Delphi;
- 
+
 const
  fVersion = '1.5.0'; // Const to manage versioning
  SingleQuote = ''''; // Character '
@@ -163,15 +158,6 @@ begin
   EnvPath := ExtractFilePath(ParamStr(0)) + '.env';
   fromDotEnvFile := False;
   ReadEnvFile;
-end;
-
-//Method to instantiate the class in a Singleton pattern way
-class function TDotEnv4Delphi.New: iDotEnv4Delphi;
-begin
-  if not Assigned(FInstance) then
-   FInstance := Self.Create;
-
-  Result := FInstance;
 end;
 
 destructor TDotEnv4Delphi.Destroy;
@@ -739,9 +725,5 @@ end;
 
 initialization
 
-begin
-  //Here the instance of the DotEnv4Delphi is created to be used in a Sigleton Pattern way
-  DotEnv := tDotEnv4Delphi.New;
-end;
 
 end.
