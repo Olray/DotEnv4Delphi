@@ -16,7 +16,7 @@ uses
   DUnitX.TestFramework,
   LegacyTest in 'LegacyTest.pas',
   DotEnv4Delphi in '..\src\DotEnv4Delphi.pas',
-  ConenctionStringTest in 'ConenctionStringTest.pas';
+  ConnectionStringTest in 'ConnectionStringTest.pas';
 
 { keep comment here to protect the following conditional from being removed by the IDE when adding a unit }
 {$IFNDEF TESTINSIGHT}

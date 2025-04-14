@@ -1,4 +1,4 @@
-unit ConenctionStringTest;
+unit ConnectionStringTest;
 
 interface
 
@@ -7,7 +7,7 @@ uses
 
 type
   [TestFixture]
-  TMyTestObject = class
+  TConnectionStringTest = class
   public
 
     [Test]
@@ -29,7 +29,7 @@ uses
 
 { TMyTestObject }
 
-procedure TMyTestObject.ConnectionStringTestFull;
+procedure TConnectionStringTest.ConnectionStringTestFull;
 var Intf :IConnectionString;
 begin
   Intf := ConnectionStringFactory('mysql://username:password@127.0.0.1:3306/db_name?serverVersion=8.0.30');
@@ -41,7 +41,7 @@ begin
   Assert.AreEqual('serverVersion=8.0.30', Intf.GetParameters);
 end;
 
-procedure TMyTestObject.ConnectionStringTestOmitUsernameAndPassword;
+procedure TConnectionStringTest.ConnectionStringTestOmitUsernameAndPassword;
 var Intf :IConnectionString;
 begin
   Intf := ConnectionStringFactory('mysql://127.0.0.1:3306/db_name?serverVersion=8.0.30');
@@ -53,7 +53,7 @@ begin
   Assert.AreEqual('serverVersion=8.0.30', Intf.GetParameters);
 end;
 
-procedure TMyTestObject.TestBinding;
+procedure TConnectionStringTest.TestBinding;
 var LStream: TStringStream;
     LContentString: string;
     LEnv: IDotEnv4Delphi;
@@ -81,7 +81,7 @@ begin
 end;
 
 
-procedure TMyTestObject.ConnectionStringOmitPath;
+procedure TConnectionStringTest.ConnectionStringOmitPath;
 var Intf :IConnectionString;
 begin
   Intf := ConnectionStringFactory('mysql://127.0.0.1:3306/?serverVersion=8.0.30');
@@ -93,7 +93,7 @@ begin
   Assert.AreEqual('serverVersion=8.0.30', Intf.GetParameters);
 end;
 
-procedure TMyTestObject.ConnectionStringOmitProtocol;
+procedure TConnectionStringTest.ConnectionStringOmitProtocol;
 var Intf :IConnectionString;
 begin
   Assert.WillRaise(
@@ -105,6 +105,6 @@ begin
 end;
 
 initialization
-  TDUnitX.RegisterTestFixture(TMyTestObject);
+  TDUnitX.RegisterTestFixture(TConnectionStringTest);
 
 end.

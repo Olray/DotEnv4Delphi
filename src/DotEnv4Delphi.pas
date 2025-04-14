@@ -25,6 +25,16 @@ type
 //--------------------------------------------------------------------------------------------------------------------------
 {$REGION 'DotEnv4Delphi´s interface'}
 
+  IConnectionString = interface
+  ['{6A8046DB-4346-43BA-993E-318291C3A4C0}']
+    function GetProtocol: string;
+    function GetUsername: string;
+    function GetPassword: string;
+    function GetHost: string;
+    function GetPath: string;
+    function GetParameters: string;
+  end;
+
   iDotEnv4Delphi = interface
     ['{3BF1532F-91B1-4C1F-A40A-CD81F8754451}']
     //Main methods
@@ -46,14 +56,7 @@ type
     function Token: string;
 
     //To access Database Connection specific variables
-    function Hostname: string;
-    function DBHost: string;
-    function DBPort: integer;
-    function DBPortOrDefault(const default: integer = 0): integer;
-    function DBPassword: string;
-    function ConnectionString: string;
-    function Password: string;
-    function DatabaseURL: string;
+    function GetConnectionStringByName(const EnvVarName: string): IConnectionString;
 
     //To access Development specific variables
     function isDevelopment: Boolean;
@@ -67,15 +70,6 @@ type
     function ProgramFiles: String;
     function OS: string;
     function AppPath: string;
-  end;
-
-  IConnectionString = interface
-    function GetProtocol: string;
-    function GetUsername: string;
-    function GetPassword: string;
-    function GetHost: string;
-    function GetPath: string;
-    function GetParameters: string;
   end;
 
 {$ENDREGION}
@@ -115,14 +109,7 @@ type
      function Token: string;
 
      //To access Database Connection specific variables
-     function Hostname: string;
-     function DBHost: string;
-     function DBPort: integer;
-     function DBPortOrDefault(const default: integer = 0): integer;
-     function DBPassword: string;
-     function ConnectionString: string;
-     function DatabaseURL: string;
-     function Password: string;
+     function GetConnectionStringByName(const EnvVarName: string): IConnectionString;
 
      //To access Development specific variables
      function isDevelopment: Boolean;
@@ -394,6 +381,12 @@ begin
    Result := Value;
 end;
 
+function TDotEnv4Delphi.GetConnectionStringByName(
+  const EnvVarName: string): IConnectionString;
+begin
+  Result := TConnectionString.Create(Env(EnvVarName));
+end;
+
 /// <summary>
 ///   Use this method to get the version of DotEnv4Delphi
 /// </summary>
@@ -612,166 +605,8 @@ begin
 end;
 {$ENDREGION}
 //--------------------------------------------------------------------------------------------------------------------------
-{$REGION 'Methods to work with Database connections'}
-/// <summary>
-///   Read variable and get the connection string
-/// </summary>
-function TDotEnv4Delphi.ConnectionString: string;
-var
-  ConnStr: string;
-begin
-  ConnStr := Env('ConnectionString');
 
-  if ConnStr = EmptyStr then
-   ConnStr := Env('CONNECTIONSTRING');
-
-  if ConnStr = EmptyStr then
-   ConnStr := Env('Connection_String');
-
-  if ConnStr = EmptyStr then
-   ConnStr := Env('CONNECTION_STRING');
-
-  Result := ConnStr;
-end;
-
-/// <summary>
-///   Read variable and get the Database URL
-/// </summary>
-function TDotEnv4Delphi.DatabaseURL: string;
-var
-  fDBURL: string;
-begin
-  fDBURL := Env('DATABASE_URL');
-
-  if fDBURL = EmptyStr then
-   fDBURL := Env('Database_URL');
-
-  if fDBURL = EmptyStr then
-   fDBURL := Env('DatabaseURL');
-
-  if fDBURL = EmptyStr then
-   fDBURL := Env('Database_URL');
-
-  Result := fDBURL;
-end;
-
-/// <summary>
-///   Read variable and get the DB Host
-/// </summary>
-function TDotEnv4Delphi.DBHost: string;
-var
-  db_host: string;
-begin
-  db_host := Env('DBHOST');
-
-  if db_host = EmptyStr then
-   db_host := Env('DB_HOST');
-
-  if db_host = EmptyStr then
-   db_host := Env('DB_Host');
-
-  if db_host = EmptyStr then
-   db_host := Env('DbHost');
-
-  Result := db_host;
-end;
-
-/// <summary>
-///   Read variable and get the DB Password
-/// </summary>
-function TDotEnv4Delphi.DBPassword: string;
-var
-  Pass: string;
-begin
-  Pass := Env('DBPassword');
-
-  if Pass = EmptyStr then
-   Pass := Env('DB_Password');
-
-  if Pass = EmptyStr then
-   Pass := Env('DB_PASSWORD');
-
-  if Pass = EmptyStr then
-   Pass := Env('DBPASSWORD');
-
-  Result := Pass;
-end;
-
-/// <summary>
-///   Read variable and get the Port to use to access the Database
-/// </summary>
-function TDotEnv4Delphi.DBPort: integer;
-var
-  _port: string;
-begin
-  Result := 0;
-
-  _port := Env('DBPort');
-
-  if _Port = EmptyStr then
-   _port := Env('DBPORT');
-
-  if _Port <> EmptyStr then
-   Result := StrToInt(_Port);
-end;
-
-/// <summary>
-///   Read variable and get the Port to use to access the Database otherwise returns the default value defined
-/// </summary>
-/// <param name="default">The default value</param>
-function TDotEnv4Delphi.DBPortOrDefault(const default: integer = 0): integer;
-var
-  _port: string;
-begin
-  _port := Env('DBPort');
-
-  if _Port = EmptyStr then
-   _port := Env('DBPORT');
-
-  if _Port <> EmptyStr then
-   Result := StrToInt(_Port)
-  else
-   Result := default;
-end;
-
-/// <summary>
-///   Read variable and get the Hostname to connect to the Database
-/// </summary>
-function TDotEnv4Delphi.Hostname: string;
-var
-  _host: string;
-begin
-  _host := Env('Hostname');
-
-  if _host = EmptyStr then
-   _host := Env('HOSTNAME');
-
-  if _host = EmptyStr then
-   _host := Env('Host_Name');
-
-  if _host = EmptyStr then
-   _host := Env('HOST_NAME');
-
-  Result := _host;
-end;
-
-/// <summary>
-///   Read variable and get the Password
-/// </summary>
-function TDotEnv4Delphi.Password: string;
-var
-  _pass: string;
-begin
-  _pass := Env('Password');
-
-  if _pass = EmptyStr then
-   _pass := Env('PASSWORD');
-
-  Result := _pass;
-end;
-{$ENDREGION}
-
-{ TDatabaseConnection }
+{ TConnectionString }
 
 constructor TConnectionString.Create(const AConnectionString: string);
 begin

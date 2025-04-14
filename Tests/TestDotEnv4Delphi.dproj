@@ -96,7 +96,7 @@
         </DelphiCompile>
         <DCCReference Include="LegacyTest.pas"/>
         <DCCReference Include="..\src\DotEnv4Delphi.pas"/>
-        <DCCReference Include="ConenctionStringTest.pas"/>
+        <DCCReference Include="ConnectionStringTest.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
