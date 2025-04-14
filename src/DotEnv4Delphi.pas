@@ -44,6 +44,7 @@ type
     function Env(const EnvVar: TEnvVar): string; overload;
     function EnvOrDefault(const name, default: string): string; overload;
     function EnvOrDefault(const EnvVar: TEnvVar; default: string): string; overload;
+    function GetFirstEnvVarInList(const keys: array of string): string;
     function GetVersion: string;
 
     //Specific methods to access specific variables
@@ -98,6 +99,7 @@ type
      function EnvOrDefault(const name, default: string): string; overload;
      function EnvOrDefault(const EnvVar: TEnvVar; default: string): string; overload;
      function GetVersion: string;
+     function GetFirstEnvVarInList(const keys: array of string): string;
 
      //Specific methods to access specific variables
 
@@ -387,6 +389,18 @@ begin
   Result := TConnectionString.Create(Env(EnvVarName));
 end;
 
+function TDotEnv4Delphi.GetFirstEnvVarInList(
+  const keys: array of string): string;
+var LKey: string;
+    LValue: string;
+begin
+  for LKey in keys do
+  begin
+    if EnvDict.TryGetValue(LKey, LValue) then
+      Exit(LValue);
+  end;
+end;
+
 /// <summary>
 ///   Use this method to get the version of DotEnv4Delphi
 /// </summary>
@@ -435,10 +449,7 @@ var
 begin
   Result := false;
 
-  Dev := Env('Development');
-
-  if Dev = EmptyStr then
-   Dev := Env('DEVELOPMENT');
+  Dev := GetFirstEnvVarInList(['Development', 'DEVELOPMENT']);
 
   if (Dev <> EmptyStr) and (Dev.ToUpper = 'TRUE')  then
    Result := True;
@@ -527,36 +538,16 @@ end;
 ///   Read the variable and fill the BaseUrl of the webAPI
 /// </summary>
 function TDotEnv4Delphi.BaseUrl: string;
-var
- Base: string;
 begin
-  Base := Env('BASE_URL');
-
-  if Base = EmptyStr then
-   Base := Env('BASEURL');
-
-  Result := Base;
+  Result := GetFirstEnvVarInList(['BASE_URL', 'BASEURL']);
 end;
 
 /// <summary>
 ///   Read the variable and fill the Secret Key of the webAPI
 /// </summary>
 function TDotEnv4Delphi.SecretKey: string;
-var
-  fSecret: string;
 begin
-  fSecret := Env('SECRET_KEY');
-
-  if fSecret = EmptyStr then
-   fSecret := Env('Secret_Key');
-
-  if fSecret = EmptyStr then
-   fSecret := Env('SecretKey');
-
-  if fSecret = EmptyStr then
-   fSecret := Env('SECRETKEY');
-
-  Result := fSecret;
+  Result := GetFirstEnvVarInList(['SECRET_KEY', 'Secret_Key', 'SecretKey', 'SECRETKEY']);
 end;
 
 /// <summary>
@@ -568,10 +559,7 @@ var
 begin
   Result := 0;
 
-  _port := Env('Port');
-
-  if _Port = EmptyStr then
-   _port := Env('PORT');
+  _port := GetFirstEnvVarInList(['Port', 'PORT']);
 
   if _Port <> EmptyStr then
    Result := StrToInt(_Port);
@@ -585,10 +573,7 @@ function TDotEnv4Delphi.PortOrDefault(const default: integer): integer;
 var
   _port: string;
 begin
-  _port := Env('Port');
-
-  if _Port = EmptyStr then
-   _port := Env('PORT');
+  _port := GetFirstEnvVarInList(['Port', 'PORT']);
 
   if _Port <> EmptyStr then
    Result := StrToInt(_Port)
@@ -606,7 +591,7 @@ end;
 {$ENDREGION}
 //--------------------------------------------------------------------------------------------------------------------------
 
-{ TConnectionString }
+{$REGION 'TConnectionString' }
 
 constructor TConnectionString.Create(const AConnectionString: string);
 begin
@@ -698,6 +683,7 @@ begin
   Result := FParameters;
 end;
 
+{$ENDREGION}
 
 { Factories }
 

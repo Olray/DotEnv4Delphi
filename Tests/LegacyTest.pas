@@ -12,14 +12,13 @@ type
     procedure WriteMockEnvFile(const Content: string);
     procedure RemoveMockEnvFile;
   public
-    [Setup]
-    procedure Setup;
-    [TearDown]
-    procedure TearDown;
     [Test]
     procedure GeneralAvailabilityTest;
     [Test]
     procedure CreateFromStreamTest;
+    [Test]
+    procedure GetFirstEnvVarInListTest;
+
   end;
 
 implementation
@@ -68,12 +67,22 @@ begin
   end;
 end;
 
-procedure TMyTestObject.Setup;
+procedure TMyTestObject.GetFirstEnvVarInListTest;
+var LStream: TStringStream;
+    LContentString: string;
+    LEnv: IDotEnv4Delphi;
 begin
-end;
+  LContentString :=
+    'TEST3=value'+sLineBreak;
 
-procedure TMyTestObject.TearDown;
-begin
+  LStream := TStringStream.Create;
+  try
+    LStream.WriteString(LContentString);
+    LEnv := DotEnv4DelphiFactory(LStream);
+    Assert.AreEqual('value', LEnv.GetFirstEnvVarInList(['TEST1', 'TEST2', 'TEST3', 'TEST4']));
+  finally
+    LStream.Free;
+  end;
 end;
 
 procedure TMyTestObject.WriteMockEnvFile(const Content: string);
