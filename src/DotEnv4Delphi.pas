@@ -671,7 +671,12 @@ var
          PosFim := Pos('}', Result);
          LKey := Copy(Result, PosIni + 2, PosFim - (PosIni + 2));
          if ExistingVars.TryGetValue(LKey, LValue) then
-           Result := StringReplace(Result, '${' + LKey + '}', LValue, [rfReplaceAll]);
+           Result := StringReplace(Result, '${' + LKey + '}', LValue, [rfReplaceAll])
+         else // var doesn't exist, see if we find a system env var for this process
+         begin
+           LValue := GetEnvironmentVariable(LKey);
+           Result := StringReplace(Result, '${' + LKey + '}', LValue, [rfReplaceAll])
+         end;
        end;
     end;
  end;

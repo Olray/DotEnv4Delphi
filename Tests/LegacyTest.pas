@@ -28,6 +28,8 @@ type
     procedure PresenceTest;
     [Test]
     procedure CascadeTest;
+    [Test]
+    procedure CanImportEnvironmentVariables;
 
   end;
 
@@ -36,6 +38,27 @@ uses
   System.SysUtils, // FileExists
   System.Classes,  // TStreamWriter
   DotEnv4Delphi;   // Test subject
+
+procedure TMyTestObject.CanImportEnvironmentVariables;
+var LStream: TStringStream;
+    LContentString: string;
+    LEnv: IDotEnv4Delphi;
+begin
+  LContentString :=
+    'KEY=${PATH}'+sLineBreak+
+    'KEY2=${NON_EXISTING_ENV_VAR}'+sLineBreak;
+
+  LStream := TStringStream.Create;
+  try
+    LStream.WriteString(LContentString);
+    LEnv := DotEnv4DelphiFactory(LStream);
+    var PathVar := LEnv.Env('KEY');
+    Assert.IsTrue(Length(LEnv.Env('KEY')) > 10);
+    Assert.AreEqual('', LEnv.Env('KEY2'));
+  finally
+    LStream.Free;
+  end;
+end;
 
 procedure TMyTestObject.CanOverrideValuesTest;
 var LStream: TStringStream;
