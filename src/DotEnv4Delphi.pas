@@ -136,9 +136,9 @@ var
  DotEnv: iDotEnv4Delphi;
  
 const
- fVersion = '1.5.0';  //Const to manage versioning
- SingleQuote = #39;  //Caracter '
-//-------------------------------------------------------------------------------------------------------------------------- 
+ fVersion = '1.5.0'; // Const to manage versioning
+ SingleQuote = ''''; // Character '
+//--------------------------------------------------------------------------------------------------------------------------
 
 implementation
 
@@ -148,6 +148,7 @@ uses
     TypInfo,
     Classes;
   {$ELSE}
+    System.StrUtils,
     System.SysUtils,
     System.TypInfo,
     System.Classes;
@@ -190,7 +191,7 @@ procedure TDotEnv4Delphi.ReadEnvFile;
 
   function PegarValor(const valor: string): string;
 
-   function RemoverComentario(const valor: string): string;
+  function RemoverComentario(const valor: string): string;
    var
     positionOfLastQuote: integer;
    begin
@@ -217,7 +218,7 @@ procedure TDotEnv4Delphi.ReadEnvFile;
       end;
    end;
 
-   function Interpolar(const valor: string): string;
+  function Interpolar(const valor: string): string;
    var
     PosIni, PosFim : integer;
     chave, ValorChave: string;
@@ -236,30 +237,41 @@ procedure TDotEnv4Delphi.ReadEnvFile;
       end;
    end;
 
-   function RemoverAspas(const valor: string): string;
-   var
+  function RemoverAspas(const valor: string): string;
+  var
     positionOfLastQuote: integer;
-   begin
-     if (valor.StartsWith('"')) or (valor.StartsWith(SingleQuote)) then
-      begin
-        positionOfLastQuote := Pos('"', Copy(valor, 2, length(valor) - 1));
-        if positionOfLastQuote = 0 then
-         positionOfLastQuote := Pos(SingleQuote, Copy(valor, 2, length(valor) - 1));
-
-        if positionOfLastQuote > 0 then
-         begin
-          Result := StringReplace(valor, '"', '', [rfReplaceAll]);
-          Result := StringReplace(valor, SingleQuote, '', [rfReplaceAll]);
-         end;
-      end
-     else
-      Result := valor;
-   end;
   begin
-    Result := Trim(RemoverAspas(Interpolar(RemoverComentario(valor))));
+    if (valor.StartsWith('"')) or (valor.StartsWith(SingleQuote)) then
+    begin
+      positionOfLastQuote := Pos('"', Copy(valor, 2, length(valor) - 1));
+      if positionOfLastQuote = 0 then
+        positionOfLastQuote := Pos(SingleQuote, Copy(valor, 2, length(valor) - 1));
+
+      if positionOfLastQuote > 0 then
+      begin
+        Result := StringReplace(valor, '"', '', [rfReplaceAll]);
+        Result := StringReplace(valor, SingleQuote, '', [rfReplaceAll]);
+      end;
+    end
+    else
+     Result := valor;
+   end;
+
+  function StripQuotes(const AStr: string): string;
+  begin
+    if (Length(AStr) > 1) and
+       ((AStr[1] = '''') and (AStr[High(AStr)] = '''') or
+        (AStr[1] = '"') and (AStr[High(AStr)] = '"')) then
+      Result := Copy(AStr, 2, Length(AStr) - 2)
+    else
+      Result := AStr;
   end;
 
-  procedure PopulateDictionary(const Dict: TDictionary<string, string>);
+  begin
+    Result := StripQuotes(Trim(RemoverAspas(Interpolar(RemoverComentario(valor)))));
+  end;
+
+procedure PopulateDictionary(const Dict: TDictionary<string, string>);
   var
     fFile    : tstringlist;
     position : Integer;
