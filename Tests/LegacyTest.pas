@@ -11,6 +11,8 @@ type
   private
     procedure WriteMockEnvFile(const Content: string);
     procedure RemoveMockEnvFile;
+    procedure WriteMockLocalEnvFile(const Content: string);
+    procedure RemoveMockLocalEnvFile;
   public
     [Test]
     procedure GeneralAvailabilityTest;
@@ -24,6 +26,8 @@ type
     procedure InterpolationTest;
     [Test]
     procedure PresenceTest;
+    [Test]
+    procedure CascadeTest;
 
   end;
 
@@ -50,6 +54,24 @@ begin
     Assert.AreEqual('value2', LEnv.Env('KEY'));
   finally
     LStream.Free;
+  end;
+end;
+
+procedure TMyTestObject.CascadeTest;
+var LEnv : IDotEnv4Delphi;
+begin
+  WriteMockEnvFile(
+    'USERNAME=username'+sLineBreak+
+    'PASSWORD=password'+sLineBreak
+  );
+  WriteMockLocalEnvFile(
+    'DATABASE_URL="mysql://${USERNAME}:${PASSWORD}@127.0.0.1:3306/db_name?serverVersion=8.0.30"'+sLineBreak
+  );
+  try
+    LEnv := DotEnv4DelphiFactory(['.env', '.env.local']);
+    Assert.AreEqual('mysql://username:password@127.0.0.1:3306/db_name?serverVersion=8.0.30', LEnv.Env('DATABASE_URL'));
+  finally
+    RemoveMockEnvFile;
   end;
 end;
 
@@ -163,12 +185,29 @@ begin
   end;
 end;
 
+procedure TMyTestObject.WriteMockLocalEnvFile(const Content: string);
+var LFile: TStreamWriter;
+begin
+  LFile := TStreamWriter.Create('.env.local');
+  try
+    LFile.Write(Content);
+  finally
+    LFile.Free;
+  end;
+end;
+
 procedure TMyTestObject.RemoveMockEnvFile;
 begin
   if FileExists('.env') then
     DeleteFile('.env');
 end;
 
+
+procedure TMyTestObject.RemoveMockLocalEnvFile;
+begin
+  if FileExists('.env.local') then
+    DeleteFile('.env.local');
+end;
 
 initialization
   TDUnitX.RegisterTestFixture(TMyTestObject);

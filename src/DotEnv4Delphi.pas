@@ -45,6 +45,7 @@ type
     //Main methods
     function Config(const OnlyFromEnvFile: Boolean = False): iDotEnv4Delphi; overload;
     function Config(const path: string = ''; OnlyFromEnvFile: Boolean = False): iDotEnv4Delphi; overload;
+    procedure LoadAnotherEnvFile(const AStream: TStream);
     function Env(const name: string): string; overload;
     function Env(const EnvVar: TEnvVar): string; overload;
     function EnvOrDefault(const name, default: string): string; overload;
@@ -95,6 +96,7 @@ type
      //Main methods
      function Config(const OnlyFromEnvFile: Boolean = False): iDotEnv4Delphi; overload;
      function Config(const path: string = ''; OnlyFromEnvFile: Boolean = False): iDotEnv4Delphi; overload;
+     procedure LoadAnotherEnvFile(const AStream: TStream);
      function Env(const name: string): string; overload;
      function Env(const EnvVar: TEnvVar): string; overload;
      function EnvOrDefault(const name, default: string): string; overload;
@@ -161,6 +163,7 @@ type
 
 function DotEnv4DelphiFactory(const FileName: string): IDotEnv4Delphi; overload;
 function DotEnv4DelphiFactory(const FileStream: TStream): IDotEnv4Delphi; overload;
+function DotEnv4DelphiFactory(const FileNames: TArray<string>): IDotEnv4Delphi; overload;
 function ConnectionStringFactory(const ConnectionString: string): IConnectionString;
 
 resourcestring
@@ -226,9 +229,15 @@ end;
 procedure TDotEnv4Delphi.ReadEnvFile(const AStream: TStream);
 var LReader : IEnvReader;
 begin
+  EnvDict.Clear;
   LReader := TEnvReader.Create;
-  // do not clear to allow cascading of .env files
-//  EnvDict.Clear;
+  LReader.LoadEnvStreamAddToDictionary(AStream, EnvDict);
+end;
+
+procedure TDotEnv4Delphi.LoadAnotherEnvFile(const AStream: TStream);
+var LReader: IEnvReader;
+begin
+  LReader := TEnvReader.Create;
   LReader.LoadEnvStreamAddToDictionary(AStream, EnvDict);
 end;
 
@@ -573,6 +582,33 @@ end;
 function DotEnv4DelphiFactory(const FileStream: TStream): IDotEnv4Delphi;
 begin
   Result := TDotEnv4Delphi.CreateFromStream(FileStream);
+end;
+
+function DotEnv4DelphiFactory(const FileNames: TArray<string>): IDotEnv4Delphi;
+var
+  LStream: TFileStream;
+begin
+  Result := nil;
+  for var i := Low(FileNames) to High(FileNames) do
+  begin
+    if Result = nil then // first existing env file creates instance
+    begin
+      if FileExists(FileNames[i]) then
+        Result := DotEnv4DelphiFactory(FileNames[i])
+    end
+    else // more existing files override the env variables
+    begin
+      if FileExists(FileNames[i]) then // ignore non-existing files
+      begin
+        LStream := TFileStream.Create(FileNames[i], fmOpenRead or fmShareDenyWrite);
+        try
+          Result.LoadAnotherEnvFile(LStream);
+        finally
+          LStream.Free;
+        end;
+      end;
+    end;
+  end;
 end;
 
 function ConnectionStringFactory(const ConnectionString: string): IConnectionString;
