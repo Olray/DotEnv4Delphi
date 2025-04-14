@@ -70,3 +70,6 @@ modules/
 
 # DotEnv environment variables during Development
 .env
+
+# Compiled binaries
+bin/
