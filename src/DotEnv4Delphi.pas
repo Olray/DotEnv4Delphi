@@ -10,7 +10,8 @@ uses
   {$IFDEF FPC}
     Generics.Collections;
   {$ELSE}
-    System.Generics.Collections;
+    System.Generics.Collections,
+    System.Classes; // TStream
   {$ENDIF}
 
 type
@@ -73,15 +74,15 @@ type
     private
      //Variables to manage the class
      fromDotEnvFile: Boolean;
-     EnvPath:        string;
      EnvDict:        TDictionary<string, string>;
 
      //Methods to make the class work
-     procedure ReadEnvFile;
+     procedure ReadEnvFile(const AStream: TStream);
      function ReadValueFromEnvFile(const key: string): string;
     public
      //Constructors and Destructors
      constructor Create;
+     constructor CreateFromStream(const FileStream: TStream);
      Destructor Destroy; override;
 
      //Main methods
@@ -123,15 +124,22 @@ type
      function CommonProgramFiles: string;
      function ProgramFiles: String;
      function OS: string;
-     function AppPath: string;     
+     function AppPath: string;
   end;
 {$EndRegion}
+
+function DotEnv4DelphiFactory(const FileName: string): IDotEnv4Delphi; overload;
+function DotEnv4DelphiFactory(const FileStream: TStream): IDotEnv4Delphi; overload;
+
+resourcestring
+  SFileNotFoundError = 'Environment file %s not found';
+
 //--------------------------------------------------------------------------------------------------------------------------
 
 //--------------------------------------------------------------------------------------------------------------------------
 
 const
- fVersion = '1.5.0'; // Const to manage versioning
+ fVersion = '2.0.0'; // Const to manage versioning
  SingleQuote = ''''; // Character '
 //--------------------------------------------------------------------------------------------------------------------------
 
@@ -145,8 +153,7 @@ uses
   {$ELSE}
     System.StrUtils,
     System.SysUtils,
-    System.TypInfo,
-    System.Classes;
+    System.TypInfo;
   {$ENDIF}
 
 { TDotEnv4Delphi }
@@ -154,10 +161,15 @@ uses
 {$REGION 'Constructor and Destructor'}
 constructor TDotEnv4Delphi.Create;
 begin
-  EnvDict := TDictionary<string, string>.create;
-  EnvPath := ExtractFilePath(ParamStr(0)) + '.env';
+  raise Exception.Create('not implemented');
+end;
+
+constructor TDotEnv4Delphi.CreateFromStream(const FileStream: TStream);
+begin
+  EnvDict := TDictionary<string, string>.Create;
   fromDotEnvFile := False;
-  ReadEnvFile;
+  FileStream.Position := 0;
+  ReadEnvFile(FileStream);
 end;
 
 destructor TDotEnv4Delphi.Destroy;
@@ -168,103 +180,104 @@ end;
 {$ENDREGION}
 //--------------------------------------------------------------------------------------------------------------------------
 {$REGION 'Internal Methods to make the class work'}
+
 function TDotEnv4Delphi.ReadValueFromEnvFile(const key: string): string;
 begin
   EnvDict.TryGetValue(key.ToUpper, Result);
 end;
 
-procedure TDotEnv4Delphi.ReadEnvFile;
+procedure TDotEnv4Delphi.ReadEnvFile(const AStream: TStream);
 
   function PegarValor(const valor: string): string;
 
-  function RemoverComentario(const valor: string): string;
-   var
-    positionOfLastQuote: integer;
-   begin
-     if (valor.StartsWith('"')) or (valor.StartsWith(SingleQuote)) then
+    function RemoverComentario(const valor: string): string;
+     var
+      positionOfLastQuote: integer;
+     begin
+       if (valor.StartsWith('"')) or (valor.StartsWith(SingleQuote)) then
+        begin
+          positionOfLastQuote := Pos('"', Copy(valor, 2, length(valor) - 1));
+          if positionOfLastQuote = 0 then
+           positionOfLastQuote := Pos(SingleQuote, Copy(valor, 2, length(valor) - 1));
+
+          if positionOfLastQuote > 0 then
+           begin
+             if Pos('# ', valor) > positionOfLastQuote then
+              Result := Copy(valor, 1, Pos('# ', valor) - 2)
+             else
+              Result := valor;
+           end;
+        end
+       else
+        begin
+         if Pos('# ', valor) > 0 then
+          Result := Copy(valor, 1, Pos('# ', valor) - 2)
+         else
+          Result := valor;
+        end;
+     end;
+
+    function Interpolar(const valor: string): string;
+     var
+      PosIni, PosFim : integer;
+      chave, ValorChave: string;
+     begin
+       Result := valor;
+       if (not valor.StartsWith('"')) and (not valor.StartsWith(SingleQuote)) then
+        begin
+          while Pos('${', Result) > 0 do
+           begin
+             PosIni := Pos('${', Result);
+             PosFim := Pos('}', Result);
+             chave := Copy(Result, PosIni + 2, PosFim - (PosIni + 2));
+             ValorChave := Env(chave);
+             Result := StringReplace(Result, '${' + chave + '}', ValorChave, [rfReplaceAll]);
+           end;
+        end;
+     end;
+
+    function RemoverAspas(const valor: string): string;
+    var
+      positionOfLastQuote: integer;
+    begin
+      if (valor.StartsWith('"')) or (valor.StartsWith(SingleQuote)) then
       begin
         positionOfLastQuote := Pos('"', Copy(valor, 2, length(valor) - 1));
         if positionOfLastQuote = 0 then
-         positionOfLastQuote := Pos(SingleQuote, Copy(valor, 2, length(valor) - 1));
+          positionOfLastQuote := Pos(SingleQuote, Copy(valor, 2, length(valor) - 1));
 
         if positionOfLastQuote > 0 then
-         begin
-           if Pos('# ', valor) > positionOfLastQuote then
-            Result := Copy(valor, 1, Pos('# ', valor) - 2)
-           else
-            Result := valor;
-         end;
+        begin
+          Result := StringReplace(valor, '"', '', [rfReplaceAll]);
+          Result := StringReplace(valor, SingleQuote, '', [rfReplaceAll]);
+        end;
       end
-     else
-      begin
-       if Pos('# ', valor) > 0 then
-        Result := Copy(valor, 1, Pos('# ', valor) - 2)
-       else
-        Result := valor;
-      end;
-   end;
+      else
+       Result := valor;
+     end;
 
-  function Interpolar(const valor: string): string;
-   var
-    PosIni, PosFim : integer;
-    chave, ValorChave: string;
-   begin
-     Result := valor;
-     if (not valor.StartsWith('"')) and (not valor.StartsWith(SingleQuote)) then
-      begin
-        while Pos('${', Result) > 0 do
-         begin
-           PosIni := Pos('${', Result);
-           PosFim := Pos('}', Result);
-           chave := Copy(Result, PosIni + 2, PosFim - (PosIni + 2));
-           ValorChave := Env(chave);
-           Result := StringReplace(Result, '${' + chave + '}', ValorChave, [rfReplaceAll]);
-         end;
-      end;
-   end;
-
-  function RemoverAspas(const valor: string): string;
-  var
-    positionOfLastQuote: integer;
-  begin
-    if (valor.StartsWith('"')) or (valor.StartsWith(SingleQuote)) then
+    function StripQuotes(const AStr: string): string;
     begin
-      positionOfLastQuote := Pos('"', Copy(valor, 2, length(valor) - 1));
-      if positionOfLastQuote = 0 then
-        positionOfLastQuote := Pos(SingleQuote, Copy(valor, 2, length(valor) - 1));
-
-      if positionOfLastQuote > 0 then
-      begin
-        Result := StringReplace(valor, '"', '', [rfReplaceAll]);
-        Result := StringReplace(valor, SingleQuote, '', [rfReplaceAll]);
-      end;
-    end
-    else
-     Result := valor;
-   end;
-
-  function StripQuotes(const AStr: string): string;
-  begin
-    if (Length(AStr) > 1) and
-       ((AStr[1] = '''') and (AStr[High(AStr)] = '''') or
-        (AStr[1] = '"') and (AStr[High(AStr)] = '"')) then
-      Result := Copy(AStr, 2, Length(AStr) - 2)
-    else
-      Result := AStr;
-  end;
+      if (Length(AStr) > 1) and
+         ((AStr[1] = '''') and (AStr[High(AStr)] = '''') or
+          (AStr[1] = '"') and (AStr[High(AStr)] = '"')) then
+        Result := Copy(AStr, 2, Length(AStr) - 2)
+      else
+        Result := AStr;
+    end;
 
   begin
     Result := StripQuotes(Trim(RemoverAspas(Interpolar(RemoverComentario(valor)))));
   end;
 
-procedure PopulateDictionary(const Dict: TDictionary<string, string>);
+  procedure PopulateDictionary(const Dict: TDictionary<string, string>; const SourceStream: TStream);
   var
     fFile    : tstringlist;
     position : Integer;
   begin
     fFile := TStringList.Create;
     try
-      fFile.LoadFromFile(EnvPath);
+      fFile.LoadFromStream(SourceStream);
       for position := 0 to fFile.Count - 1 do
        begin
          if not (fFile.Names[position].ToUpper = EmptyStr) then
@@ -276,12 +289,10 @@ procedure PopulateDictionary(const Dict: TDictionary<string, string>);
       FreeAndNil(fFile)
     end;
   end;
+
 begin
-  if FileExists(EnvPath) then
-   begin
-     EnvDict.Clear;
-     PopulateDictionary(EnvDict);
-   end;
+  EnvDict.Clear;
+  PopulateDictionary(EnvDict, AStream);
 end;
 {$ENDREGION}
 //--------------------------------------------------------------------------------------------------------------------------
@@ -373,14 +384,17 @@ end;
 /// <param name="path">Set the path of the DotEnv file you want to use</param>
 /// <param name="OnlyFromEnvFile">Set it to True to only use variables declared in the DotEnv file</param>
 function TDotEnv4Delphi.Config(const path: string; OnlyFromEnvFile: Boolean): iDotEnv4Delphi;
+var LStream: TFileStream;
 begin
   Result := Self;
   fromDotEnvFile := OnlyFromEnvFile;
-  if (path <> EmptyStr) and (path <> EnvPath) then
-   begin
-    EnvPath := path;
-    ReadEnvFile;
-   end;
+
+  LStream := TFileStream.Create(path, fmOpenRead or fmShareDenyWrite);
+  try
+    ReadEnvFile(LStream);
+  finally
+    LStream.Free;
+  end;
 end;
 {$ENDREGION}
 //--------------------------------------------------------------------------------------------------------------------------
@@ -722,6 +736,26 @@ begin
   Result := _pass;
 end;
 {$ENDREGION}
+
+
+function DotEnv4DelphiFactory(const FileName: string): IDotEnv4Delphi;
+var LStream: TFileStream;
+begin
+  if not FileExists(FileName) then
+    raise Exception.CreateResFmt(@SFileNotFoundError, [ExpandFileName(FileName)]);
+  LStream := TFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
+  try
+    Result := DotEnv4DelphiFactory(LStream);
+  finally
+    LStream.Free;
+  end;
+end;
+
+function DotEnv4DelphiFactory(const FileStream: TStream): IDotEnv4Delphi;
+begin
+  Result := TDotEnv4Delphi.CreateFromStream(FileStream);
+end;
+
 
 initialization
 

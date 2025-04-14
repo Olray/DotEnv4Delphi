@@ -18,6 +18,8 @@ type
     procedure TearDown;
     [Test]
     procedure GeneralAvailabilityTest;
+    [Test]
+    procedure CreateFromStreamTest;
   end;
 
 implementation
@@ -26,8 +28,30 @@ uses
   System.Classes,  // TStreamWriter
   DotEnv4Delphi;   // Test subject
 
+procedure TMyTestObject.CreateFromStreamTest;
+var LStream: TStringStream;
+    LContentString: string;
+    LEnv: IDotEnv4Delphi;
+begin
+  LContentString :=
+    'DATABASE_URL="mysql://username:password@127.0.0.1:3306/db_name?serverVersion=8.0.30"'+sLineBreak+
+    'MAILER_DSN=smtp://service@example.com:testpassword@hostingprovider.tld'+sLineBreak+
+    'APP_ENV=dev'+sLineBreak;
+
+  LStream := TStringStream.Create;
+  try
+    LStream.WriteString(LContentString);
+    LEnv := DotEnv4DelphiFactory(LStream);
+    Assert.AreEqual('mysql://username:password@127.0.0.1:3306/db_name?serverVersion=8.0.30', LEnv.Env('DATABASE_URL'));
+    Assert.AreEqual('smtp://service@example.com:testpassword@hostingprovider.tld', LEnv.Env('MAILER_DSN'));
+    Assert.AreEqual('dev', LEnv.Env('APP_ENV'));
+  finally
+    LStream.Free;
+  end;
+end;
+
 procedure TMyTestObject.GeneralAvailabilityTest;
-var LEnv : TDotEnv4Delphi;
+var LEnv : IDotEnv4Delphi;
 begin
   WriteMockEnvFile(
     'DATABASE_URL="mysql://username:password@127.0.0.1:3306/db_name?serverVersion=8.0.30"'+sLineBreak+
@@ -35,14 +59,10 @@ begin
     'APP_ENV=dev'+sLineBreak
   );
   try
-    LEnv := TDotEnv4Delphi.Create;
-    try
-      Assert.AreEqual('mysql://username:password@127.0.0.1:3306/db_name?serverVersion=8.0.30', LEnv.Env('DATABASE_URL'));
-      Assert.AreEqual('smtp://service@example.com:testpassword@hostingprovider.tld', LEnv.Env('MAILER_DSN'));
-      Assert.AreEqual('dev', LEnv.Env('APP_ENV'));
-    finally
-      LEnv.Free;
-    end;
+    LEnv := DotEnv4DelphiFactory('.env');
+    Assert.AreEqual('mysql://username:password@127.0.0.1:3306/db_name?serverVersion=8.0.30', LEnv.Env('DATABASE_URL'));
+    Assert.AreEqual('smtp://service@example.com:testpassword@hostingprovider.tld', LEnv.Env('MAILER_DSN'));
+    Assert.AreEqual('dev', LEnv.Env('APP_ENV'));
   finally
     RemoveMockEnvFile;
   end;
