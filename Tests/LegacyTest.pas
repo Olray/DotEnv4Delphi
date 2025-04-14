@@ -95,6 +95,7 @@ begin
     Assert.AreEqual('mysql://username:password@127.0.0.1:3306/db_name?serverVersion=8.0.30', LEnv.Env('DATABASE_URL'));
   finally
     RemoveMockEnvFile;
+    RemoveMockLocalEnvFile;
   end;
 end;
 
