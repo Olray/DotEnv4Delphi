@@ -23,7 +23,8 @@ type
              PASSWORD, DBPASSWORD, BASE_URL, TOKEN, API_TOKEN, CONNECTIONSTRING, DEVELOPMENT, DATABASE_URL, SECRET_KEY);
 {$EndRegion}
 //--------------------------------------------------------------------------------------------------------------------------
-{$Region 'DotEnv4Delphi큦 interface'}
+{$REGION 'DotEnv4Delphi큦 interface'}
+
   iDotEnv4Delphi = interface
     ['{3BF1532F-91B1-4C1F-A40A-CD81F8754451}']
     //Main methods
@@ -67,9 +68,19 @@ type
     function OS: string;
     function AppPath: string;
   end;
-{$EndRegion}
+
+  IConnectionString = interface
+    function GetProtocol: string;
+    function GetUsername: string;
+    function GetPassword: string;
+    function GetHost: string;
+    function GetPath: string;
+    function GetParameters: string;
+  end;
+
+{$ENDREGION}
 //--------------------------------------------------------------------------------------------------------------------------
-{$Region 'DotEnv4Delphi큦 class declaration'}
+{$REGION 'DotEnv4Delphi큦 class declaration'}
   TDotEnv4Delphi = class(TInterfacedObject, iDotEnv4Delphi)
     private
      //Variables to manage the class
@@ -126,10 +137,33 @@ type
      function OS: string;
      function AppPath: string;
   end;
-{$EndRegion}
+
+  TConnectionString = class(TInterfacedObject, IConnectionString)
+  private
+    FProtocol: string;
+    FUsername: string;
+    FPassword: string;
+    FHost: string;
+    FPath: string;
+    FParameters: string;
+
+    procedure ParseConnectionString(const AConnectionString: string);
+  public
+    constructor Create(const AConnectionString: string);
+      // interface IDatabaseConnection
+    function GetProtocol: string;
+    function GetUsername: string;
+    function GetPassword: string;
+    function GetHost: string;
+    function GetPath: string;
+    function GetParameters: string;
+  end;
+
+{$ENDREGION}
 
 function DotEnv4DelphiFactory(const FileName: string): IDotEnv4Delphi; overload;
 function DotEnv4DelphiFactory(const FileStream: TStream): IDotEnv4Delphi; overload;
+function ConnectionStringFactory(const ConnectionString: string): IConnectionString;
 
 resourcestring
   SFileNotFoundError = 'Environment file %s not found';
@@ -737,6 +771,100 @@ begin
 end;
 {$ENDREGION}
 
+{ TDatabaseConnection }
+
+constructor TConnectionString.Create(const AConnectionString: string);
+begin
+  ParseConnectionString(AConnectionString);
+end;
+
+procedure TConnectionString.ParseConnectionString(const AConnectionString: string);
+var
+  URI, AuthPart, HostPart, ParamsPart: string;
+  AuthDelimiter, HostDelimiter, ParamsDelimiter: Integer;
+begin
+  // Split protocol
+  AuthDelimiter := Pos('://', AConnectionString);
+  if AuthDelimiter = 0 then
+    raise Exception.Create('Invalid connection string: Missing protocol');
+  FProtocol := Copy(AConnectionString, 1, AuthDelimiter - 1);
+  URI := Copy(AConnectionString, AuthDelimiter + 3, Length(AConnectionString));
+
+  // Split parameters
+  ParamsDelimiter := Pos('?', URI);
+  if ParamsDelimiter > 0 then
+  begin
+    FParameters := Copy(URI, ParamsDelimiter + 1, Length(URI));
+    URI := Copy(URI, 1, ParamsDelimiter - 1);
+  end;
+
+  // Split host and authentication
+  HostDelimiter := Pos('@', URI);
+  if HostDelimiter > 0 then
+  begin
+    AuthPart := Copy(URI, 1, HostDelimiter - 1);
+    HostPart := Copy(URI, HostDelimiter + 1, Length(URI));
+  end
+  else
+    HostPart := URI;
+
+  // Parse authentication
+  if AuthPart <> '' then
+  begin
+    AuthDelimiter := Pos(':', AuthPart);
+    if AuthDelimiter > 0 then
+    begin
+      FUsername := Copy(AuthPart, 1, AuthDelimiter - 1);
+      FPassword := Copy(AuthPart, AuthDelimiter + 1, Length(AuthPart));
+    end
+    else
+      FUsername := AuthPart;
+  end;
+
+  // Parse host and path
+  HostDelimiter := Pos('/', HostPart);
+  if HostDelimiter > 0 then
+  begin
+    FHost := Copy(HostPart, 1, HostDelimiter - 1);
+    FPath := Copy(HostPart, HostDelimiter + 1, Length(HostPart));
+  end
+  else
+    FHost := HostPart;
+
+end;
+
+function TConnectionString.GetProtocol: string;
+begin
+  Result := FProtocol;
+end;
+
+function TConnectionString.GetUsername: string;
+begin
+  Result := FUsername;
+end;
+
+function TConnectionString.GetPassword: string;
+begin
+  Result := FPassword;
+end;
+
+function TConnectionString.GetHost: string;
+begin
+  Result := FHost;
+end;
+
+function TConnectionString.GetPath: string;
+begin
+  Result := FPath;
+end;
+
+function TConnectionString.GetParameters: string;
+begin
+  Result := FParameters;
+end;
+
+
+{ Factories }
 
 function DotEnv4DelphiFactory(const FileName: string): IDotEnv4Delphi;
 var LStream: TFileStream;
@@ -756,6 +884,10 @@ begin
   Result := TDotEnv4Delphi.CreateFromStream(FileStream);
 end;
 
+function ConnectionStringFactory(const ConnectionString: string): IConnectionString;
+begin
+  Result := TConnectionString.Create(ConnectionString);
+end;
 
 initialization
 

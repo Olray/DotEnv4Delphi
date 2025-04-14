@@ -12,11 +12,11 @@ uses
   TestInsight.DUnitX,
   {$ELSE}
   DUnitX.Loggers.Console,
-  DUnitX.Loggers.Xml.NUnit,
   {$ENDIF }
   DUnitX.TestFramework,
   LegacyTest in 'LegacyTest.pas',
-  DotEnv4Delphi in '..\src\DotEnv4Delphi.pas';
+  DotEnv4Delphi in '..\src\DotEnv4Delphi.pas',
+  ConenctionStringTest in 'ConenctionStringTest.pas';
 
 { keep comment here to protect the following conditional from being removed by the IDE when adding a unit }
 {$IFNDEF TESTINSIGHT}
