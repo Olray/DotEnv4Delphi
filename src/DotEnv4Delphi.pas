@@ -25,6 +25,11 @@ type
 //--------------------------------------------------------------------------------------------------------------------------
 {$REGION 'DotEnv4Delphi´s interface'}
 
+  IEnvReader = interface
+  ['{D8074174-D0AB-455E-B0BC-81E33FBB25E4}']
+    procedure LoadEnvStreamAddToDictionary(const AStream: TStream; const Dict: TDictionary<string, string>);
+  end;
+
   IConnectionString = interface
   ['{6A8046DB-4346-43BA-993E-318291C3A4C0}']
     function GetProtocol: string;
@@ -63,12 +68,8 @@ type
     function isDevelopment: Boolean;
     function ComputerName: string;
     function ProcessorArchitecture: string;
-    function TEMP_Dir: string;
-    function WindowsDir: string;
-    function AppData: string;
+
     function ClientName: string;
-    function CommonProgramFiles: string;
-    function ProgramFiles: String;
     function OS: string;
     function AppPath: string;
   end;
@@ -117,12 +118,11 @@ type
      function isDevelopment: Boolean;
      function ComputerName: string;
      function ProcessorArchitecture: string;
-     function TEMP_Dir: string;
-     function WindowsDir: string;
-     function AppData: string;
+
+     // access to various system and user paths is already available in TPath:
+     // removed
+
      function ClientName: string;
-     function CommonProgramFiles: string;
-     function ProgramFiles: String;
      function OS: string;
      function AppPath: string;
   end;
@@ -148,6 +148,15 @@ type
     function GetParameters: string;
   end;
 
+  TEnvReader = class(TInterfacedObject, IEnvReader)
+  private
+    function RemoveComments(const valor: string): string;
+    function StripQuotes(const AStr: string): string;
+    function Interpolate(const Value: string; ExistingVars: TDictionary<string, string>): string;
+  public
+    procedure LoadEnvStreamAddToDictionary(const AStream: TStream; const Dict: TDictionary<string, string>);
+  end;
+
 {$ENDREGION}
 
 function DotEnv4DelphiFactory(const FileName: string): IDotEnv4Delphi; overload;
@@ -163,7 +172,9 @@ resourcestring
 
 const
  fVersion = '2.0.0'; // Const to manage versioning
- SingleQuote = ''''; // Character '
+ SingleQuote = '''';
+ DoubleQuote = '"';
+
 //--------------------------------------------------------------------------------------------------------------------------
 
 implementation
@@ -175,6 +186,7 @@ uses
     Classes;
   {$ELSE}
     System.StrUtils,
+    System.IOUtils,
     System.SysUtils,
     System.TypInfo;
   {$ENDIF}
@@ -182,9 +194,10 @@ uses
 { TDotEnv4Delphi }
 
 {$REGION 'Constructor and Destructor'}
+
 constructor TDotEnv4Delphi.Create;
 begin
-  raise Exception.Create('not implemented');
+  raise Exception.Create('not implemented, use DotEnv4DelphiFactory()');
 end;
 
 constructor TDotEnv4Delphi.CreateFromStream(const FileStream: TStream);
@@ -200,6 +213,7 @@ begin
   FreeAndNil(EnvDict);
   inherited;
 end;
+
 {$ENDREGION}
 //--------------------------------------------------------------------------------------------------------------------------
 {$REGION 'Internal Methods to make the class work'}
@@ -210,113 +224,14 @@ begin
 end;
 
 procedure TDotEnv4Delphi.ReadEnvFile(const AStream: TStream);
-
-  function PegarValor(const valor: string): string;
-
-    function RemoverComentario(const valor: string): string;
-     var
-      positionOfLastQuote: integer;
-     begin
-       if (valor.StartsWith('"')) or (valor.StartsWith(SingleQuote)) then
-        begin
-          positionOfLastQuote := Pos('"', Copy(valor, 2, length(valor) - 1));
-          if positionOfLastQuote = 0 then
-           positionOfLastQuote := Pos(SingleQuote, Copy(valor, 2, length(valor) - 1));
-
-          if positionOfLastQuote > 0 then
-           begin
-             if Pos('# ', valor) > positionOfLastQuote then
-              Result := Copy(valor, 1, Pos('# ', valor) - 2)
-             else
-              Result := valor;
-           end;
-        end
-       else
-        begin
-         if Pos('# ', valor) > 0 then
-          Result := Copy(valor, 1, Pos('# ', valor) - 2)
-         else
-          Result := valor;
-        end;
-     end;
-
-    function Interpolar(const valor: string): string;
-     var
-      PosIni, PosFim : integer;
-      chave, ValorChave: string;
-     begin
-       Result := valor;
-       if (not valor.StartsWith('"')) and (not valor.StartsWith(SingleQuote)) then
-        begin
-          while Pos('${', Result) > 0 do
-           begin
-             PosIni := Pos('${', Result);
-             PosFim := Pos('}', Result);
-             chave := Copy(Result, PosIni + 2, PosFim - (PosIni + 2));
-             ValorChave := Env(chave);
-             Result := StringReplace(Result, '${' + chave + '}', ValorChave, [rfReplaceAll]);
-           end;
-        end;
-     end;
-
-    function RemoverAspas(const valor: string): string;
-    var
-      positionOfLastQuote: integer;
-    begin
-      if (valor.StartsWith('"')) or (valor.StartsWith(SingleQuote)) then
-      begin
-        positionOfLastQuote := Pos('"', Copy(valor, 2, length(valor) - 1));
-        if positionOfLastQuote = 0 then
-          positionOfLastQuote := Pos(SingleQuote, Copy(valor, 2, length(valor) - 1));
-
-        if positionOfLastQuote > 0 then
-        begin
-          Result := StringReplace(valor, '"', '', [rfReplaceAll]);
-          Result := StringReplace(valor, SingleQuote, '', [rfReplaceAll]);
-        end;
-      end
-      else
-       Result := valor;
-     end;
-
-    function StripQuotes(const AStr: string): string;
-    begin
-      if (Length(AStr) > 1) and
-         ((AStr[1] = '''') and (AStr[High(AStr)] = '''') or
-          (AStr[1] = '"') and (AStr[High(AStr)] = '"')) then
-        Result := Copy(AStr, 2, Length(AStr) - 2)
-      else
-        Result := AStr;
-    end;
-
-  begin
-    Result := StripQuotes(Trim(RemoverAspas(Interpolar(RemoverComentario(valor)))));
-  end;
-
-  procedure PopulateDictionary(const Dict: TDictionary<string, string>; const SourceStream: TStream);
-  var
-    fFile    : tstringlist;
-    position : Integer;
-  begin
-    fFile := TStringList.Create;
-    try
-      fFile.LoadFromStream(SourceStream);
-      for position := 0 to fFile.Count - 1 do
-       begin
-         if not (fFile.Names[position].ToUpper = EmptyStr) then
-          begin
-           Dict.Add(fFile.Names[position].ToUpper, PegarValor(fFile.Values[fFile.Names[position]]));
-          end;
-       end;
-    finally
-      FreeAndNil(fFile)
-    end;
-  end;
-
+var LReader : IEnvReader;
 begin
-  EnvDict.Clear;
-  PopulateDictionary(EnvDict, AStream);
+  LReader := TEnvReader.Create;
+  // do not clear to allow cascading of .env files
+//  EnvDict.Clear;
+  LReader.LoadEnvStreamAddToDictionary(AStream, EnvDict);
 end;
+
 {$ENDREGION}
 //--------------------------------------------------------------------------------------------------------------------------
 {$REGION 'Main methods of DotEnv4Delphi Class'}
@@ -327,10 +242,7 @@ end;
 function TDotEnv4Delphi.Env(const name: string): string;
 begin
   if fromDotEnvFile then
-   begin
-     Result := ReadValueFromEnvFile(name);
-     Exit;
-   end;
+    Exit(ReadValueFromEnvFile(name));
 
   Result := GetEnvironmentVariable(name);
 
@@ -447,12 +359,8 @@ function TDotEnv4Delphi.isDevelopment: Boolean;
 var
  Dev: string;
 begin
-  Result := false;
-
-  Dev := GetFirstEnvVarInList(['Development', 'DEVELOPMENT']);
-
-  if (Dev <> EmptyStr) and (Dev.ToUpper = 'TRUE')  then
-   Result := True;
+  Dev := Env('APP_ENV');
+  Result := (Dev <> EmptyStr) and (Dev.ToUpper = 'DEV');
 end;
 
 /// <summary>
@@ -472,14 +380,6 @@ begin
 end;
 
 /// <summary>
-///   Gets the variable value and returns the Path of common program files folder.
-/// </summary>
-function TDotEnv4Delphi.CommonProgramFiles: string;
-begin
-  Result := Env(TEnvVar.COMMONPROGRAMFILES);
-end;
-
-/// <summary>
 ///   Gets the variable value and returns the Name of Computer code is running on.
 /// </summary>
 function TDotEnv4Delphi.ComputerName: string;
@@ -495,42 +395,11 @@ begin
   Result := Env(TEnvVar.PROCESSOR_ARCHITECTURE);
 end;
 
-/// <summary>
-///   Gets the variable value and returns the Path of the program files folder.
-/// </summary>
-function TDotEnv4Delphi.ProgramFiles: String;
-begin
-  Result := Env(TEnvVar.PROGRAMFILES);
-end;
-
-/// <summary>
-///   Gets the variable value and returns the Path of the Windows folder.
-/// </summary>
-function TDotEnv4Delphi.WindowsDir: string;
-begin
-  Result := Env(TEnvVar.WINDIR);
-end;
-
-/// <summary>
-///   Gets the variable value and returns the Path of the temporary files folder.
-/// </summary>
-function TDotEnv4Delphi.TEMP_Dir: string;
-begin
-  Result := Env(TEnvVar.TEMP);
-end;
-
-/// <summary>
-///   Gets the variable value and returns the Path of the application data folder.
-/// </summary>
-function TDotEnv4Delphi.AppData: string;
-begin
-  Result := Env(TEnvVar.APPDATA);
-end;
-
 function TDotEnv4Delphi.AppPath: string;
 begin
   Result := ExtractFileDir(ParamStr(0));
 end;
+
 {$ENDREGION}
 //--------------------------------------------------------------------------------------------------------------------------
 {$REGION 'Methods to access variables for a WebAPI'}
@@ -588,6 +457,7 @@ function TDotEnv4Delphi.Token: string;
 begin
   Result := Env('TOKEN');
 end;
+
 {$ENDREGION}
 //--------------------------------------------------------------------------------------------------------------------------
 
@@ -685,7 +555,7 @@ end;
 
 {$ENDREGION}
 
-{ Factories }
+{$REGION 'Factories'}
 
 function DotEnv4DelphiFactory(const FileName: string): IDotEnv4Delphi;
 var LStream: TFileStream;
@@ -708,6 +578,119 @@ end;
 function ConnectionStringFactory(const ConnectionString: string): IConnectionString;
 begin
   Result := TConnectionString.Create(ConnectionString);
+end;
+
+{$ENDREGION}
+
+{$REGION 'TEnvReader' }
+
+function TEnvReader.RemoveComments(const valor: string): string;
+ var
+  positionOfLastQuote: integer;
+ begin
+   if (valor.StartsWith(DoubleQuote)) or (valor.StartsWith(SingleQuote)) then
+    begin
+      positionOfLastQuote := Pos('"', Copy(valor, 2, length(valor) - 1));
+      if positionOfLastQuote = 0 then
+       positionOfLastQuote := Pos(SingleQuote, Copy(valor, 2, length(valor) - 1));
+
+      if positionOfLastQuote > 0 then
+       begin
+         if Pos('# ', valor) > positionOfLastQuote then
+          Result := Copy(valor, 1, Pos('# ', valor) - 2)
+         else
+          Result := valor;
+       end;
+    end
+   else
+    begin
+     if Pos('# ', valor) > 0 then
+      Result := Copy(valor, 1, Pos('# ', valor) - 2)
+     else
+      Result := valor;
+    end;
+ end;
+
+function TEnvReader.StripQuotes(const AStr: string): string;
+begin
+  if (Length(AStr) > 1) and
+     ((AStr[1] = '''') and (AStr[High(AStr)] = '''') or
+      (AStr[1] = '"') and (AStr[High(AStr)] = '"')) then
+    Result := Copy(AStr, 2, Length(AStr) - 2)
+  else
+    Result := AStr;
+end;
+
+function TEnvReader.Interpolate(const Value: string; ExistingVars: TDictionary<string, string>): string;
+var
+  PosIni, PosFim : integer;
+  LKey, LValue: string;
+ begin
+   Result := Value;
+   if (not Value.StartsWith('"')) and (not Value.StartsWith(SingleQuote)) then
+    begin
+      while Pos('${', Result) > 0 do
+       begin
+         PosIni := Pos('${', Result);
+         PosFim := Pos('}', Result);
+         LKey := Copy(Result, PosIni + 2, PosFim - (PosIni + 2));
+         if ExistingVars.TryGetValue(LKey, LValue) then
+           Result := StringReplace(Result, '${' + LKey + '}', LValue, [rfReplaceAll]);
+       end;
+    end;
+ end;
+
+procedure TEnvReader.LoadEnvStreamAddToDictionary(
+  const AStream: TStream; const Dict: TDictionary<string, string>);
+
+  // splits line in pair at the first Equal ("=") and trims
+  // if no Equal is present, the line is used as Key and the value set to "1"
+  function SplitLine(const AString: string): TPair<string, string>;
+  var LPos: Integer;
+  begin
+    LPos := Pos('=', AString);
+    if(LPos > 0) then
+    begin
+     Result.Key := Trim(LeftStr(AString, Pred(LPos)));
+     Result.Value := Trim(RightStr(AString, Pred(Length(AString)-Length(Result.Key))));
+    end
+    else
+    begin
+      Result.Key := Trim(AString);
+      Result.Value := '1';
+    end;
+  end;
+
+  function GetValuePair(const AString: string): TPair<string, string>;
+  begin
+    // remove comments
+    var CommentsRemoved := RemoveComments(AString);
+    // split into key/value pair and trim
+    Result := SplitLine(CommentsRemoved);
+    // unwrap value from single or double quotes
+    Result.Value := StripQuotes(Result.Value);
+  end;
+
+var
+  LStringList: TStringList;
+  LKeyValue: TPair<string, string>;
+begin
+  LStringList := TStringList.Create;
+  LStringList.LoadFromStream(AStream);
+  try
+    for var i := 0 to LStringList.Count - 1 do
+    begin
+      LKeyValue := GetValuePair(LStringList[i]);
+      var Interpolated := Interpolate(LKeyValue.Value, Dict);
+      Dict.AddOrSetValue(LKeyValue.Key, Interpolated);
+    end;
+
+  finally
+    LStringList.Free;
+  end;
+
+{$ENDREGION}
+
 end;
 
 initialization

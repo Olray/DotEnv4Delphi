@@ -18,6 +18,12 @@ type
     procedure CreateFromStreamTest;
     [Test]
     procedure GetFirstEnvVarInListTest;
+    [Test]
+    procedure CanOverrideValuesTest;
+    [Test]
+    procedure InterpolationTest;
+    [Test]
+    procedure PresenceTest;
 
   end;
 
@@ -26,6 +32,26 @@ uses
   System.SysUtils, // FileExists
   System.Classes,  // TStreamWriter
   DotEnv4Delphi;   // Test subject
+
+procedure TMyTestObject.CanOverrideValuesTest;
+var LStream: TStringStream;
+    LContentString: string;
+    LEnv: IDotEnv4Delphi;
+begin
+  LContentString :=
+    'KEY=value'+sLineBreak+
+    'KEY=value2'+sLineBreak+
+    'KEY=value2'+sLineBreak;
+
+  LStream := TStringStream.Create;
+  try
+    LStream.WriteString(LContentString);
+    LEnv := DotEnv4DelphiFactory(LStream);
+    Assert.AreEqual('value2', LEnv.Env('KEY'));
+  finally
+    LStream.Free;
+  end;
+end;
 
 procedure TMyTestObject.CreateFromStreamTest;
 var LStream: TStringStream;
@@ -80,6 +106,47 @@ begin
     LStream.WriteString(LContentString);
     LEnv := DotEnv4DelphiFactory(LStream);
     Assert.AreEqual('value', LEnv.GetFirstEnvVarInList(['TEST1', 'TEST2', 'TEST3', 'TEST4']));
+  finally
+    LStream.Free;
+  end;
+end;
+
+procedure TMyTestObject.InterpolationTest;
+var LStream: TStringStream;
+    LContentString: string;
+    LEnv: IDotEnv4Delphi;
+begin
+  LContentString :=
+    'HOST=127.0.0.1:3306 # The host name'+sLineBreak+
+    'USERNAME=username # The user name'+sLineBreak+
+    'PASSWORD=password'+sLineBreak+
+    'DATABASE_URL="mysql://${USERNAME}:${PASSWORD}@${HOST}/db_name?serverVersion=8.0.30"'+sLineBreak;
+
+  LStream := TStringStream.Create;
+  try
+    LStream.WriteString(LContentString);
+    LEnv := DotEnv4DelphiFactory(LStream);
+    Assert.AreEqual('mysql://username:password@127.0.0.1:3306/db_name?serverVersion=8.0.30', LEnv.Env('DATABASE_URL'));
+  finally
+    LStream.Free;
+  end;
+end;
+
+procedure TMyTestObject.PresenceTest;
+var LStream: TStringStream;
+    LContentString: string;
+    LEnv: IDotEnv4Delphi;
+begin
+  LContentString :=
+    'I_AM_HERE'+sLineBreak+
+    'I_AM_EMPTY=';
+
+  LStream := TStringStream.Create;
+  try
+    LStream.WriteString(LContentString);
+    LEnv := DotEnv4DelphiFactory(LStream);
+    Assert.AreEqual('1', LEnv.Env('I_AM_HERE'));
+    Assert.AreEqual('', LEnv.Env('I_AM_EMPTY'));
   finally
     LStream.Free;
   end;
